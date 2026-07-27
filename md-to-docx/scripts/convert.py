@@ -251,9 +251,9 @@ def convert(input_path, output_path):
             if rows: add_table(doc, rows)
             tb = []; num_cnt = 0; continue
 
-        # Horizontal rule
+        # Horizontal rule — skip
         if line.strip() == '---':
-            add_hr(doc); num_cnt = 0; i += 1; continue
+            num_cnt = 0; i += 1; continue
 
         # Lists
         if re.match(r'^[\s]*\- ', line):
