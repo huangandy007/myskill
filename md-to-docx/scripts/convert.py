@@ -56,12 +56,12 @@ def add_rich(paragraph, text):
         if nxt >= len(text): break
         if bm and idx + bm.start() == nxt:
             r = paragraph.add_run(bm.group(1)); r.bold = True
-            idx += len(bm.group(0))
+            idx = nxt + len(bm.group(0))
         elif cm and idx + cm.start() == nxt:
             r = paragraph.add_run(cm.group(1))
             r.font.name = FONT_CODE; r.font.size = SIZE_CODE
             r.font.color.rgb = COLOR_CODE
-            idx += len(cm.group(0))
+            idx = nxt + len(cm.group(0))
         else:
             paragraph.add_run(text[idx]); idx += 1
 
