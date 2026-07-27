@@ -71,7 +71,8 @@ def build_doc():
     ns = doc.styles['Normal']
     ns.font.name = FONT_BODY; ns.font.size = SIZE_BODY
     ns.element.rPr.rFonts.set(qn('w:eastAsia'), FONT_BODY)
-    for i, (fn, fs) in enumerate([(FONT_HEI, SIZE_H1), (FONT_HEI, SIZE_H2), (FONT_KAI, SIZE_H3)]):
+    # H1-H4 all use SimHei (黑体)
+    for i, (fn, fs) in enumerate([(FONT_HEI, SIZE_H1), (FONT_HEI, SIZE_H2), (FONT_HEI, SIZE_H3), (FONT_HEI, SIZE_H3)]):
         h = doc.styles['Heading %d' % (i+1)]; f = h.font
         f.name = fn; f.size = fs
         h.element.rPr.rFonts.set(qn('w:eastAsia'), fn)
@@ -80,9 +81,32 @@ def build_doc():
 def add_p(doc, text):
     p = doc.add_paragraph(); add_rich(p, text)
 
-def add_li(doc, text, num=False):
+def add_li(doc, text, num=False, restart=False):
     p = doc.add_paragraph(style='List Number' if num else 'List Bullet')
     p.clear(); add_rich(p, text)
+    if num and restart:
+        # Force Word to restart numbering via XML
+        pPr = p._element.get_or_add_pPr()
+        numPr = pPr.find(qn('w:numPr'))
+        if numPr is None:
+            numPr = OxmlElement('w:numPr')
+            pPr.insert(0, numPr)
+        # Add w:startOverride to restart at 1
+        numId_elem = numPr.find(qn('w:numId'))
+        if numId_elem is not None:
+            numId_val = numId_elem.get(qn('w:val'))
+            # Clear existing numPr children and rebuild with restart
+            for child in list(numPr):
+                numPr.remove(child)
+            ni = OxmlElement('w:numId')
+            ni.set(qn('w:val'), numId_val)
+            numPr.append(ni)
+            ilvl = OxmlElement('w:ilvl')
+            ilvl.set(qn('w:val'), '0')
+            numPr.append(ilvl)
+            so = OxmlElement('w:startOverride')
+            so.set(qn('w:val'), '1')
+            numPr.append(so)
 
 def add_table(doc, rows):
     nc = max(len(r) for r in rows)
@@ -155,7 +179,7 @@ def convert(input_path, output_path):
         lines = f.readlines()
 
     doc = build_doc()
-    i = 0; in_cb = False; cb = []; tb = []; box_buf = []
+    i = 0; in_cb = False; cb = []; tb = []; box_buf = []; last_was_num = False
 
     def flush_box():
         nonlocal box_buf
@@ -181,7 +205,7 @@ def convert(input_path, output_path):
                 desc = match_diagram(raw)
                 if desc: add_desc(doc, desc)
                 else: add_code(doc, cb)
-                cb = []; in_cb = False
+                cb = []; in_cb = False; last_was_num = False
             else:
                 flush_box(); in_cb = True
             i += 1; continue
@@ -193,7 +217,7 @@ def convert(input_path, output_path):
                 desc = match_diagram(raw)
                 if desc: add_desc(doc, desc)
                 elif cb: add_code(doc, cb)
-                cb = []; in_cb = False
+                cb = []; in_cb = False; last_was_num = False
                 # Fall through to process this heading
             else:
                 cb.append(line); i += 1; continue
@@ -208,10 +232,10 @@ def convert(input_path, output_path):
         flush_box()
 
         # Headings (highest priority)
-        if line.startswith('#### '): doc.add_heading(line[5:], level=3); i += 1; continue
-        if line.startswith('### '):  doc.add_heading(line[4:], level=3); i += 1; continue
-        if line.startswith('## '):   doc.add_heading(line[3:], level=2); i += 1; continue
-        if line.startswith('# '):    doc.add_heading(line[2:], level=1); i += 1; continue
+        if line.startswith('#### '): doc.add_heading(line[5:], level=4); last_was_num = False; i += 1; continue
+        if line.startswith('### '):  doc.add_heading(line[4:], level=3); last_was_num = False; i += 1; continue
+        if line.startswith('## '):   doc.add_heading(line[3:], level=2); last_was_num = False; i += 1; continue
+        if line.startswith('# '):    doc.add_heading(line[2:], level=1); last_was_num = False; i += 1; continue
 
         # Table
         if line.startswith('|') and line.endswith('|'):
@@ -224,17 +248,18 @@ def convert(input_path, output_path):
                 if re.match(r'^\|[\s\-:|]+\|$', tl): continue
                 rows.append([c.strip() for c in tl.split('|')[1:-1]])
             if rows: add_table(doc, rows)
-            tb = []; continue
+            tb = []; last_was_num = False; continue
 
         # Horizontal rule
         if line.strip() == '---':
-            add_hr(doc); i += 1; continue
+            add_hr(doc); last_was_num = False; i += 1; continue
 
         # Lists
         if re.match(r'^[\s]*\- ', line):
-            add_li(doc, re.sub(r'^[\s]*\- ', '', line)); i += 1; continue
+            add_li(doc, re.sub(r'^[\s]*\- ', '', line)); last_was_num = False; i += 1; continue
         if re.match(r'^\d+\.\s', line):
-            add_li(doc, re.sub(r'^\d+\.\s', '', line), True); i += 1; continue
+            add_li(doc, re.sub(r'^\d+\.\s', '', line), True, restart=not last_was_num)
+            last_was_num = True; i += 1; continue
 
         # Skip orphan box-drawing lines
         if re.match(r'^[\s]*[┌┐└┘├┤│─┬┴┼╭╮╰╯▁▔]', line):
@@ -242,7 +267,7 @@ def convert(input_path, output_path):
 
         # Normal paragraph
         if line.strip():
-            add_p(doc, line)
+            add_p(doc, line); last_was_num = False
 
         i += 1
 
