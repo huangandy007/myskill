@@ -105,6 +105,8 @@ def add_num_li(doc, text, counter):
     p = doc.add_paragraph()
     p.paragraph_format.left_indent = Cm(1.27)
     p.paragraph_format.first_line_indent = Cm(-0.63)
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(0)
     add_rich(p, f"{counter}. {text}")
 
 def add_table(doc, rows):
