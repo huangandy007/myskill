@@ -305,9 +305,8 @@ def process_inline_tokens(tokens: List[Token], paragraph, base_font_size: int = 
                             run.font.color.rgb = RGBColor(0x00, 0x00, 0xFF)
                             run.underline = True
             else:
-                font_size = Pt(10) if (bold_count > 0 or italic_count > 0) else Pt(base_font_size)
                 run = paragraph.add_run(text)
-                run.font.size = font_size
+                run.font.size = Pt(base_font_size)
                 run.font.name = base_font_name
                 run._element.rPr.rFonts.set(qn('w:eastAsia'), base_font_name)
                 if bold_count > 0 or is_header:
