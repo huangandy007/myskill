@@ -423,6 +423,8 @@ def convert_markdown_to_docx(markdown_text: str, output_path: str,
     style.font.name = '微软雅黑'
     style.font.size = Pt(12)
     style.element.rPr.rFonts.set(qn('w:eastAsia'), '微软雅黑')
+    # 默认两端对齐（对应 Word「全选 > 两端对齐」）；标题/图片/图注/分割线各自显式 CENTER，不受影响
+    style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
     i = 0
     while i < len(tokens):
